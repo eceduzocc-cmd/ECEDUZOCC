@@ -1,0 +1,8 @@
+{
+  "name": "EduGestión Pro - Escuela de Ciencias de la Educación",
+  "description": "Sistema avanzado de gestión administrativa y académica con inteligencia artificial integrada para la Escuela de Ciencias de la Educación.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
