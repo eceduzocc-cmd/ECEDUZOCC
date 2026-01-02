@@ -1,4 +1,6 @@
 
+
+
 export interface Student {
   id: string;
   name: string;
@@ -7,6 +9,47 @@ export interface Student {
   semester: number;
   status: 'Activo' | 'Inactivo' | 'Pendiente';
   gpa: number;
+  lastAccess?: string;
+  alerts?: number;
+}
+
+export interface Course {
+  id: string;
+  name: string;
+  credits: number;
+  type: 'Teórico' | 'Práctico' | 'Metodológico';
+  semester: number;
+}
+
+export interface Program {
+  id: string;
+  name: string;
+  level: 'Grado' | 'Posgrado';
+  modality: 'Virtual' | 'Distancia';
+  totalCredits: number;
+  snies: string;
+  courses: Course[];
+  description: string;
+}
+
+export interface QualityFactor {
+  id: number;
+  name: string;
+  progress: number;
+  status: 'Cumplido' | 'En Proceso' | 'Crítico';
+  evidenceCount: number;
+}
+
+export interface AcademicDegree {
+  id: string;
+  level: 'Pregrado' | 'Especialización' | 'Maestría' | 'Doctorado' | 'Posdoctorado';
+  title: string;
+}
+
+export interface TrainingItem {
+  diplomaName: string;
+  certificationDate: string;
+  evidence?: { name: string; size: string };
 }
 
 export interface Teacher {
@@ -14,6 +57,7 @@ export interface Teacher {
   name: string;
   identityCard: string;
   center: string;
+  educationLevel: string; // Nivel máximo (Admin)
   specialty: string;
   department: string;
   email: string;
@@ -24,6 +68,12 @@ export interface Teacher {
   hoursPerWeek: number;
   status: 'Disponible' | 'Carga Completa' | 'Licencia';
   isActive: boolean;
+  // Campos de Autogestión (Dinámicos)
+  detailedDegrees?: AcademicDegree[];
+  foreignLanguageLevel?: 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+  trainingRoute?: TrainingItem[]; // Ruta formativa de formador de formadores
+  moocIngreso?: TrainingItem; // Nuevo: MOC de Ingreso
+  profileCompleted?: boolean;
 }
 
 export interface AcademicPeriod {
@@ -31,6 +81,7 @@ export interface AcademicPeriod {
   name: string;
   status: 'Abierto' | 'Cerrado';
   participatingTeacherIds: string[];
+  teacherWorkloads?: Record<string, 'TC' | 'MT' | 'HC' | 'A'>;
 }
 
 export interface PDIMapping {
@@ -50,7 +101,7 @@ export interface MasterFunction {
   id: string;
   name: string;
   description: string;
-  category?: string; // Nuevo: Para clasificación en Gestión Documental
+  category?: string;
   pdiMappings: PDIMapping[];
   substantiveFunctions: string[];
   contractualGeneral: string[];
@@ -68,7 +119,7 @@ export interface AssignedFunction {
   masterFunctionId: string;
   name: string;
   description: string;
-  category?: string; // Nuevo: Para clasificación en Gestión Documental
+  category?: string;
   evidenceUrl?: string;
   status: 'Pendiente' | 'Entregado';
   pdiMappings?: PDIMapping[];
@@ -77,17 +128,8 @@ export interface AssignedFunction {
   contractualDirector?: string[];
   contractualLeader?: string[];
   evidenceSchema?: EvidenceField[];
-  evidenceData?: Record<string, string | { name: string; size: number }>;
-}
-
-export interface Assignment {
-  id: string;
-  teacherId: string;
-  courseName: string;
-  schedule: string;
-  room: string;
-  group: string;
-  periodId: string;
+  // Fix: evidenceData expects size as string for formatted size strings, and optional type/data for PDF generation
+  evidenceData?: Record<string, string | { name: string; size: string; type?: string; data?: string }>;
 }
 
 export interface Message {
@@ -103,7 +145,9 @@ export enum View {
   TEACHER_PROFILES = 'TEACHER_PROFILES',
   ASSIGNMENTS = 'ASSIGNMENTS',
   TEACHER_FUNCTIONS = 'TEACHER_FUNCTIONS',
-  DOCUMENT_MANAGEMENT = 'DOCUMENT_MANAGEMENT', // Nuevo
+  DOCUMENT_MANAGEMENT = 'DOCUMENT_MANAGEMENT',
+  CURRICULUM = 'CURRICULUM',
+  QUALITY = 'QUALITY',
   AI_ASSISTANT = 'AI_ASSISTANT',
   SETTINGS = 'SETTINGS'
 }

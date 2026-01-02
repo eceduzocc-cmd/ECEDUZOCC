@@ -4,12 +4,13 @@ import { UserPlus, Star, Award, BookOpen, ChevronRight } from 'lucide-react';
 import { Teacher } from '../types';
 
 const mockTeachers: Teacher[] = [
-  // Fix: Added missing properties identityCard, center, email, and isActive to satisfy the Teacher interface
+  // Fix: Added missing property educationLevel to satisfy the Teacher interface
   { 
     id: '1', 
     name: 'Dr. Fernando Ruiz', 
     identityCard: '10928374',
     center: 'Centro de Innovación Educativa',
+    educationLevel: 'Doctorado',
     specialty: 'Neuroeducación', 
     department: 'Ciencias Básicas', 
     email: 'fruiz@edu.co',
@@ -20,12 +21,13 @@ const mockTeachers: Teacher[] = [
     status: 'Carga Completa',
     isActive: true
   },
-  // Fix: Added missing properties identityCard, center, email, and isActive to satisfy the Teacher interface
+  // Fix: Added missing property educationLevel to satisfy the Teacher interface
   { 
     id: '2', 
     name: 'Msc. Elena Torres', 
     identityCard: '22837465',
     center: 'Facultad de Artes',
+    educationLevel: 'Maestría',
     specialty: 'Educación Inclusiva', 
     department: 'Pedagogía', 
     email: 'etorres@edu.co',
@@ -36,12 +38,13 @@ const mockTeachers: Teacher[] = [
     status: 'Disponible',
     isActive: true
   },
-  // Fix: Added missing properties identityCard, center, email, and isActive to satisfy the Teacher interface
+  // Fix: Added missing property educationLevel to satisfy the Teacher interface
   { 
     id: '3', 
     name: 'Lic. Roberto Diaz', 
     identityCard: '33948576',
     center: 'Centro de Tecnología',
+    educationLevel: 'Pregrado',
     specialty: 'Tics en Educación', 
     department: 'Tecnología', 
     email: 'rdiaz@edu.co',
@@ -52,12 +55,13 @@ const mockTeachers: Teacher[] = [
     status: 'Disponible',
     isActive: false
   },
-  // Fix: Added missing properties identityCard, center, email, and isActive to satisfy the Teacher interface
+  // Fix: Added missing property educationLevel to satisfy the Teacher interface
   { 
     id: '4', 
     name: 'Dra. Isabel Luna', 
     identityCard: '44059687',
     center: 'Facultad de Pedagogía',
+    educationLevel: 'Doctorado',
     specialty: 'Didáctica de la Ciencia', 
     department: 'Pedagogía', 
     email: 'iluna@edu.co',

@@ -47,7 +47,9 @@ import {
   Verified,
   AlertTriangle,
   ShieldAlert,
-  Fingerprint
+  Fingerprint,
+  Timer,
+  Shield
 } from 'lucide-react';
 import { AcademicPeriod, Teacher, MasterFunction, PDIMapping, EvidenceField } from '../types';
 
@@ -340,7 +342,8 @@ const MasterFunctions: React.FC<MasterFunctionsProps> = ({
       id: `p-${Date.now()}`,
       name: newPeriodName,
       status: 'Abierto',
-      participatingTeacherIds: []
+      participatingTeacherIds: [],
+      teacherWorkloads: {}
     };
     setPeriods([newPeriod, ...periods]);
     setNewPeriodName('');
@@ -355,7 +358,33 @@ const MasterFunctions: React.FC<MasterFunctionsProps> = ({
       const newIds = isParticipating 
         ? p.participatingTeacherIds.filter(id => id !== teacherId)
         : [...p.participatingTeacherIds, teacherId];
-      return { ...p, participatingTeacherIds: newIds };
+      
+      // Limpiar carga horaria si se desactiva
+      const newWorkloads = { ...(p.teacherWorkloads || {}) };
+      if (isParticipating) {
+        delete newWorkloads[teacherId];
+      }
+      
+      return { ...p, participatingTeacherIds: newIds, teacherWorkloads: newWorkloads };
+    }));
+  };
+
+  const setTeacherWorkload = (periodId: string, teacherId: string, type: 'TC' | 'MT' | 'HC' | 'A') => {
+    setPeriods(prev => prev.map(p => {
+      if (p.id !== periodId) return p;
+      
+      // Asegurar que el docente esté activado al seleccionar carga
+      let newIds = [...p.participatingTeacherIds];
+      if (!newIds.includes(teacherId)) {
+        newIds.push(teacherId);
+      }
+      
+      const newWorkloads = { 
+        ...(p.teacherWorkloads || {}), 
+        [teacherId]: type 
+      };
+      
+      return { ...p, participatingTeacherIds: newIds, teacherWorkloads: newWorkloads };
     }));
   };
 
@@ -423,7 +452,7 @@ const MasterFunctions: React.FC<MasterFunctionsProps> = ({
       </div>
 
       {activeTab === 'periods' ? (
-        /* VISTA DE PERIODOS (MANTENIDA POR INTEGRIDAD) */
+        /* VISTA DE PERIODOS */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           <div className="lg:col-span-4 space-y-6">
             <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm overflow-hidden relative">
@@ -469,18 +498,62 @@ const MasterFunctions: React.FC<MasterFunctionsProps> = ({
                       <input type="text" placeholder="Filtrar por nombre..." className="w-full bg-white/10 border border-white/20 rounded-2xl py-3 pl-12 pr-4 text-xs font-bold text-white outline-none placeholder:text-white/50" value={teacherSearch} onChange={(e) => setTeacherSearch(e.target.value)} />
                     </div>
                  </div>
-                 <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/30">
+                 <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-8 bg-slate-50/30">
                     {filteredTeachers.map(teacher => {
-                      const isActive = periods.find(p => p.id === selectedPeriodId)?.participatingTeacherIds.includes(teacher.id);
+                      const currentPeriod = periods.find(p => p.id === selectedPeriodId);
+                      const isActive = currentPeriod?.participatingTeacherIds.includes(teacher.id);
+                      const currentWorkload = currentPeriod?.teacherWorkloads?.[teacher.id];
+                      
+                      const workloads: { id: 'TC' | 'MT' | 'HC' | 'A', label: string, color: string, bg: string }[] = [
+                        { id: 'TC', label: 'TC', color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                        { id: 'MT', label: 'MT', color: 'text-purple-600', bg: 'bg-purple-50' },
+                        { id: 'HC', label: 'HC', color: 'text-amber-600', bg: 'bg-amber-50' },
+                        { id: 'A', label: 'A', color: 'text-slate-600', bg: 'bg-slate-100' }
+                      ];
+
                       return (
-                        <div key={teacher.id} className={`p-6 rounded-[32px] border-2 transition-all flex items-center justify-between bg-white ${isActive ? 'border-indigo-200 shadow-md scale-[1.02]' : 'border-transparent opacity-60'}`}>
-                          <div className="flex items-center gap-4">
-                            <img src={teacher.imageUrl} className={`w-14 h-14 rounded-2xl object-cover ${isActive ? 'ring-4 ring-indigo-50' : 'grayscale'}`} />
-                            <p className="font-black text-sm text-slate-900">{teacher.name}</p>
+                        <div key={teacher.id} className={`p-8 rounded-[35px] border-2 transition-all flex flex-col gap-6 bg-white ${isActive ? 'border-indigo-200 shadow-xl scale-[1.02]' : 'border-transparent opacity-70 grayscale-[0.5]'}`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-5">
+                              <div className="relative">
+                                <img src={teacher.imageUrl} className={`w-16 h-16 rounded-[22px] object-cover ${isActive ? 'ring-4 ring-indigo-50 shadow-lg' : ''}`} />
+                                {isActive && (
+                                  <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-1 rounded-lg border-2 border-white shadow-md">
+                                    <CheckCircle2 size={12} />
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-black text-sm text-slate-900 leading-tight mb-1 uppercase tracking-tight">{teacher.name}</p>
+                                <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{teacher.center}</p>
+                              </div>
+                            </div>
+                            <button onClick={() => toggleTeacherParticipation(selectedPeriodId!, teacher.id)} className={`p-3 rounded-[20px] transition-all shadow-sm ${isActive ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-300 hover:text-slate-400'}`}>
+                              {isActive ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+                            </button>
                           </div>
-                          <button onClick={() => toggleTeacherParticipation(selectedPeriodId!, teacher.id)} className={`p-3 rounded-2xl transition-all ${isActive ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400'}`}>
-                            {isActive ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
-                          </button>
+
+                          <div className="space-y-3 pt-4 border-t border-slate-50">
+                             <div className="flex items-center gap-2 mb-2">
+                                <Timer size={14} className="text-slate-300" />
+                                <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Tipo de Vinculación</span>
+                             </div>
+                             <div className="grid grid-cols-4 gap-2">
+                                {workloads.map(wl => (
+                                  <button
+                                    key={wl.id}
+                                    onClick={() => setTeacherWorkload(selectedPeriodId!, teacher.id, wl.id)}
+                                    className={`py-2.5 rounded-xl text-[10px] font-black transition-all border-2 ${
+                                      currentWorkload === wl.id 
+                                        ? `bg-slate-900 border-slate-900 text-white shadow-lg scale-[1.05]` 
+                                        : `bg-slate-50 border-transparent text-slate-400 hover:bg-white hover:border-slate-200`
+                                    }`}
+                                  >
+                                    {wl.label}
+                                  </button>
+                                ))}
+                             </div>
+                          </div>
                         </div>
                       );
                     })}

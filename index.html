@@ -4,82 +4,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduGestión Pro - Escuela de Ciencias de la Educación</title>
+    <title>EduPro Cloud - Gestión ECE</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-            --accent-gradient: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            --unad-blue: #004170;
+            --unad-yellow: #ffb100;
         }
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: #f1f5f9;
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.05) 0, transparent 50%),
-                radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.05) 0, transparent 50%);
+            background-color: #f8fafc;
         }
-        .font-brand {
-            font-family: 'Montserrat', sans-serif;
-        }
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
+        .font-brand { font-family: 'Montserrat', sans-serif; }
         .mesh-gradient {
-            background-color: #6366f1;
-            background-image: 
-                radial-gradient(at 40% 20%, #a855f7 0px, transparent 50%),
-                radial-gradient(at 80% 0%, #6366f1 0px, transparent 50%),
-                radial-gradient(at 0% 50%, #10b981 0px, transparent 50%);
+            background: linear-gradient(135deg, var(--unad-blue) 0%, #002a4a 100%);
         }
-        .animate-float {
-            animation: float 6s ease-in-out infinite;
+        .glass {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        .animate-spin-slow {
-            animation: spin 8s linear infinite;
+        /* Animaciones para una sensación fluida */
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
-        @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-            100% { transform: translateY(0px); }
+        @keyframes scan {
+            0% { top: 0; }
+            50% { top: 100%; }
+            100% { top: 0; }
         }
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
+        .animate-slide-up { animation: slideUp 0.5s ease-out forwards; }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "recharts": "https://esm.sh/recharts@^3.6.0",
-    "jspdf": "https://esm.sh/jspdf@^2.5.1"
-  }
-}
-</script>
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom": "https://esm.sh/react-dom@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "react/": "https://esm.sh/react@18.2.0/",
+        "react-dom/": "https://esm.sh/react-dom@18.2.0/",
+        "lucide-react": "https://esm.sh/lucide-react@0.344.0?external=react",
+        "@google/genai": "https://esm.sh/@google/genai@1.3.0",
+        "recharts": "https://esm.sh/recharts@2.12.2?external=react",
+        "jspdf": "https://esm.sh/jspdf@2.5.1"
+      }
+    }
+    </script>
 </head>
-<body class="overflow-hidden">
+<body>
     <div id="root"></div>
+    <script type="module" src="index.tsx"></script>
 </body>
 </html>

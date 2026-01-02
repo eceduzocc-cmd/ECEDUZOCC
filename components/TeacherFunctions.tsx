@@ -1,57 +1,60 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
-  IdCard,
   CheckCircle2,
-  Clock,
-  Award,
   Plus,
-  Briefcase,
-  UserCheck,
-  Upload,
-  Target,
   Layers,
-  ChevronDown,
-  ChevronUp,
-  ClipboardCheck,
-  Layout,
   Type,
   Paperclip,
-  CheckCircle,
   FileCheck,
-  AlertCircle,
-  FileText,
-  Zap,
   ShieldCheck,
-  ArrowRight,
   Download,
-  Printer,
-  FileSpreadsheet,
-  XCircle,
-  ShieldAlert,
   Fingerprint,
   Verified,
-  QrCode,
-  Stamp,
-  Settings,
-  Image as ImageIcon,
-  Send,
-  Flag,
+  Sparkles,
+  MapPin,
+  Award,
+  Globe,
+  Trash2,
+  GraduationCap,
+  Binary,
+  User,
+  Users,
+  LayoutGrid,
+  Activity,
+  History,
+  ClipboardList,
   Trophy,
-  Mail
+  Zap,
+  BookOpen,
+  GitMerge,
+  Upload,
+  Calendar,
+  Search,
+  ChevronRight,
+  XCircle,
+  Mail,
+  Shield,
+  Edit3,
+  Lock,
+  Target,
+  Link,
+  Image as ImageIcon
 } from 'lucide-react';
-import { Teacher, AcademicPeriod, AssignedFunction, EvidenceField } from '../types';
+import { Teacher, AcademicPeriod, AssignedFunction, AcademicDegree, TrainingItem } from '../types';
 import { jsPDF } from 'jspdf';
+import { geminiService } from '../services/geminiService';
 
-const MACRO_TITLES: Record<number, string> = {
-  1: "Gestión Holística",
-  2: "Innovación Conocimiento",
-  3: "Liderazgo Glocal",
-  4: "Modelos Eficientes"
+// Diccionario local para resolución de nombres PDI en el informe
+const PDI_LABELS: Record<number, string> = {
+  1: "Macroproyecto 1: Gestión holística para la educación",
+  2: "Macroproyecto 2: Ampliación y consolidación del conocimiento",
+  3: "Macroproyecto 3: Liderazgo transformacional territorial",
+  4: "Macroproyecto 4: Plataformas escalares eficientes"
 };
 
 interface TeacherFunctionsProps {
   teachers: Teacher[];
+  setTeachers: React.Dispatch<React.SetStateAction<Teacher[]>>;
   periods: AcademicPeriod[];
   setPeriods: React.Dispatch<React.SetStateAction<AcademicPeriod[]>>;
   assignedFunctions: AssignedFunction[];
@@ -60,616 +63,845 @@ interface TeacherFunctionsProps {
 
 const TeacherFunctions: React.FC<TeacherFunctionsProps> = ({ 
   teachers, 
+  setTeachers,
   periods, 
-  setPeriods, 
   assignedFunctions, 
   setAssignedFunctions 
 }) => {
-  const [searchId, setSearchId] = useState('');
-  const [foundTeacher, setFoundTeacher] = useState<Teacher | null>(teachers[0] || null);
-  const [error, setError] = useState('');
-  const [expandedFn, setExpandedFn] = useState<string | null>(null);
+  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'evidence'>('profile');
   const [showEvidenceForm, setShowEvidenceForm] = useState<string | null>(null);
-  const [isPreviewingPDF, setIsPreviewingPDF] = useState<string | null>(null);
-  const [showStationeryConfig, setShowStationeryConfig] = useState(false);
+  
+  // Docente de referencia (Simulado para diseño)
+  const foundTeacher: Teacher = teachers[0] || {
+    id: 'dev-1',
+    name: 'Docente de Prueba ECE',
+    identityCard: '12345',
+    center: 'CEAD MEDELLÍN',
+    educationLevel: 'Maestría',
+    specialty: 'Gestión Educativa',
+    department: 'Escuela de Ciencias de la Educación',
+    email: 'docente.prueba@unad.edu.co',
+    courses: [],
+    imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Teacher',
+    rating: 5.0,
+    hoursPerWeek: 40,
+    status: 'Disponible',
+    isActive: true,
+    profileCompleted: false,
+    detailedDegrees: [],
+    foreignLanguageLevel: 'A1',
+    trainingRoute: [],
+    moocIngreso: { diplomaName: 'El docente tutor como gestor de cursos en AVA Versión 2.0', certificationDate: '' }
+  };
 
-  // Logos persistidos en el navegador
-  const [headerLogo, setHeaderLogo] = useState<string>(localStorage.getItem('unad_header_logo') || '');
-  const [footerLogos, setFooterLogos] = useState<string>(localStorage.getItem('unad_footer_logos') || '');
+  const participatingPeriods = useMemo(() => {
+    return periods.filter(p => p.participatingTeacherIds.includes(foundTeacher.id));
+  }, [periods, foundTeacher.id]);
 
-  const handleSearch = () => {
-    const teacher = teachers.find(t => t.identityCard === searchId);
-    if (teacher) {
-      if (!teacher.isActive) {
-        setError('Acceso restringido: El perfil se encuentra inactivo.');
-        setFoundTeacher(null);
-        return;
-      }
-      setFoundTeacher(teacher);
-      setError('');
+  const LANGUAGE_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
+
+  const FORMATION_ROLES = [
+    {
+      name: "Director de Curso",
+      icon: <LayoutGrid size={24} />,
+      diplomas: [
+        "e-Mediador en AVA",
+        "Gestor de Curso en Ambientes AVA",
+        "Diseño de Recursos Educativos Digitales",
+        "Evaluación del aprendizaje en AVA",
+        "Internacionalización del Currículo",
+        "Gamificación y Aprendizaje Basado en Juegos",
+        "Liderazgo Transformacional"
+      ]
+    },
+    {
+      name: "Docente",
+      icon: <Users size={24} />,
+      diplomas: [
+        "e-Mediador en AVA",
+        "Apropiación de TIC en Escenarios Inclusivos",
+        "Habilidades Socioemocionales del e-Mediador",
+        "Gamificación y Aprendizaje Basado en Juegos",
+        "Liderazgo Transformacional"
+      ]
+    },
+    {
+      name: "Docente Innovador",
+      icon: <Zap size={24} />,
+      diplomas: [
+        "e-Mediador en AVA",
+        "Apropiación de TIC en Escenarios Inclusivos",
+        "Analítica de Datos y BigData aplicada en AVA",
+        "Coaching Educativo desde el contexto de la UNAD",
+        "Liderazgo Transformacional"
+      ]
+    },
+    {
+      name: "Docente Investigador",
+      icon: <Microscope size={24} />,
+      diplomas: [
+        "e-Mediador en AVA",
+        "e-Investigador",
+        "IA aplicada a la Educación en AVA",
+        "Liderazgo Transformacional"
+      ]
+    }
+  ];
+
+  const OFFICIAL_DIPLOMAS = Array.from(new Set(FORMATION_ROLES.flatMap(r => r.diplomas))).sort();
+
+  const [localDegrees, setLocalDegrees] = useState<AcademicDegree[]>(foundTeacher.detailedDegrees || []);
+  const [localLanguage, setLocalLanguage] = useState<Teacher['foreignLanguageLevel']>(foundTeacher.foreignLanguageLevel || 'A1');
+  const [localRoute, setLocalRoute] = useState<TrainingItem[]>(foundTeacher.trainingRoute || []);
+  const [localMOOC, setLocalMOOC] = useState<TrainingItem>(foundTeacher.moocIngreso || { diplomaName: 'El docente tutor como gestor de cursos en AVA Versión 2.0', certificationDate: '' });
+
+  // Control de edición - Persistente con el estado del perfil
+  const [isEditingProfile, setIsEditingProfile] = useState(!foundTeacher.profileCompleted);
+
+  const toggleDiploma = (name: string) => {
+    if (!isEditingProfile) return;
+    const exists = localRoute.find(i => i.diplomaName === name);
+    if (exists) {
+      setLocalRoute(localRoute.filter(i => i.diplomaName !== name));
     } else {
-      setError('Cédula no encontrada en el metasistema.');
-      setFoundTeacher(null);
+      setLocalRoute([...localRoute, { diplomaName: name, certificationDate: '' }]);
     }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'header' | 'footer') => {
+  const updateDiplomaDate = (name: string, date: string) => {
+    if (!isEditingProfile) return;
+    setLocalRoute(prev => prev.map(i => i.diplomaName === name ? { ...i, certificationDate: date } : i));
+  };
+
+  const handleDiplomaEvidence = (name: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isEditingProfile) return;
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        if (type === 'header') {
-          setHeaderLogo(base64);
-          localStorage.setItem('unad_header_logo', base64);
-        } else {
-          setFooterLogos(base64);
-          localStorage.setItem('unad_footer_logos', base64);
-        }
-      };
-      reader.readAsDataURL(file);
+      setLocalRoute(prev => prev.map(i => i.diplomaName === name ? { ...i, evidence: { name: file.name, size: (file.size / 1024).toFixed(1) + ' KB' } } : i));
     }
   };
 
-  const handleUpdateEvidence = (functionId: string, fieldId: string, value: any) => {
-    setAssignedFunctions(prev => prev.map(f => {
-      if (f.id !== functionId) return f;
-      const currentData = f.evidenceData || {};
-      const newData = { ...currentData, [fieldId]: value };
-      
-      const isComplete = f.evidenceSchema?.every(field => {
-        if (!field.required) return true;
-        const val = newData[field.id];
-        return val !== undefined && val !== '' && (typeof val === 'string' ? val.trim() !== '' : true);
-      });
+  const handleMOOCEvidence = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isEditingProfile) return;
+    const file = e.target.files?.[0];
+    if (file) {
+      setLocalMOOC({ ...localMOOC, evidence: { name: file.name, size: (file.size / 1024).toFixed(1) + ' KB' } });
+    }
+  };
 
-      return { 
-        ...f, 
-        evidenceData: newData,
-        status: isComplete ? 'Pendiente' : 'Pendiente' // El estado 'Entregado' solo se asigna al Reportar
-      };
+  const handleCertifyProfile = () => {
+    setTeachers(prev => prev.map(t => {
+      if (t.id === foundTeacher.id) {
+        return {
+          ...t,
+          detailedDegrees: localDegrees,
+          foreignLanguageLevel: localLanguage,
+          trainingRoute: localRoute,
+          moocIngreso: localMOOC,
+          profileCompleted: true
+        };
+      }
+      return t;
     }));
+    setIsEditingProfile(false);
+    alert("✓ Perfil Certificado e Institucionalmente Protegido.");
+  };
+
+  const handleEditProfile = () => {
+    setIsEditingProfile(true);
   };
 
   const calculateProgress = (fn: AssignedFunction) => {
     if (!fn.evidenceSchema?.length) return 0;
-    const totalFields = fn.evidenceSchema.length;
     const completedFields = fn.evidenceSchema.filter(f => {
       const val = fn.evidenceData?.[f.id];
       return val !== undefined && val !== '' && (typeof val === 'string' ? val.trim() !== '' : true);
     }).length;
-    return Math.round((completedFields / totalFields) * 100);
+    return Math.round((completedFields / fn.evidenceSchema.length) * 100);
   };
 
-  /* 
-   * =========================================================================================
-   * MOTOR DE GENERACIÓN PDF: INFORME DE ACTIVIDADES DOCENTES v11.0
-   * =========================================================================================
-   */
   const generateInstitutionalPDF = (fn: AssignedFunction) => {
-    if (!foundTeacher) return;
-    
     const doc = new jsPDF();
-    const period = periods.find(p => p.id === fn.periodId);
-    const uniqueID = `INF-ECE-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-    const UNAD_BLUE = [0, 65, 112]; 
+    const margin = 20;
+    let y = 20;
 
-    // --- 1. ENCABEZADO (LOGO) ---
-    if (headerLogo) {
-      try {
-        doc.addImage(headerLogo, 'PNG', 15, 12, 45, 25);
-      } catch (e) { console.error(e); }
-    }
-
-    // --- 2. CABECERA DE DATOS ESTRUCTURADA ---
-    let y = 55;
-    doc.setTextColor(UNAD_BLUE[0], UNAD_BLUE[1], UNAD_BLUE[2]);
-    doc.setFontSize(14);
+    // --- ENCABEZADO INSTITUCIONAL ---
+    doc.setFillColor(0, 65, 112); // UNAD BLUE
+    doc.rect(0, 0, 210, 40, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("INFORME DE ACTIVIDADES DOCENTES", 105, y, { align: 'center' });
+    doc.text("INFORME ESTRUCTURADO DE GESTIÓN ACADÉMICA", margin, 18);
+    doc.setFontSize(10);
+    doc.text("Escuela de Ciencias de la Educación - ECE", margin, 25);
+    doc.text("Sistema de Gestión de Evidencias v5.0", margin, 31);
     
+    y = 55;
+    doc.setTextColor(0, 0, 0);
+
+    // --- BLOQUE 1: FICHA ADMINISTRATIVA ---
+    doc.setFontSize(12);
+    doc.text("1. FICHA ADMINISTRATIVA", margin, y);
+    doc.line(margin, y + 2, 190, y + 2);
     y += 12;
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`CÓDIGO DE REPORTE: ${uniqueID}`, 195, y, { align: 'right' });
-
-    y += 5;
-    doc.setDrawColor(235, 235, 235);
-    doc.setFillColor(250, 250, 250);
-    doc.rect(15, y, 180, 32, 'F');
-    doc.rect(15, y, 180, 32, 'D');
-
-    y += 8;
-    doc.setTextColor(50, 50, 50);
-    doc.setFont("helvetica", "bold");
-    doc.text("NOMBRE DEL DOCENTE:", 20, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(foundTeacher.name.toUpperCase(), 65, y);
-
-    y += 6;
-    doc.setFont("helvetica", "bold");
-    doc.text("IDENTIFICACIÓN:", 20, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(foundTeacher.identityCard, 65, y);
-
-    y += 6;
-    doc.setFont("helvetica", "bold");
-    doc.text("PERIODO ACADÉMICO:", 20, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(period?.name || 'N/A', 65, y);
-
-    y += 6;
-    doc.setFont("helvetica", "bold");
-    doc.text("ACTIVIDAD MAESTRA:", 20, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(fn.name.toUpperCase(), 65, y);
-
-    // --- 3. INDICADORES DE IMPACTO (Chips en el PDF) ---
-    y += 20;
-    doc.setTextColor(UNAD_BLUE[0], UNAD_BLUE[1], UNAD_BLUE[2]);
-    doc.setFont("helvetica", "bold");
-    doc.text("INDICADORES DE IMPACTO ESTRATÉGICO:", 15, y);
     
-    y += 8;
-    let chipX = 15;
-    doc.setFontSize(7);
-    
-    // Chips de Funciones Sustantivas
-    fn.substantiveFunctions?.forEach(sf => {
-       const text = `[ ${sf.toUpperCase()} ]`;
-       const width = doc.getTextWidth(text) + 6;
-       if (chipX + width > 195) { chipX = 15; y += 6; }
-       doc.setTextColor(80, 80, 80);
-       doc.text(text, chipX, y);
-       chipX += width;
-    });
-
-    // Chips de Microproyectos PDI
-    fn.pdiMappings?.forEach(m => {
-       m.microIds.forEach(mid => {
-         const text = `[ PROYECTO ${m.macroId}.${mid} ]`;
-         const width = doc.getTextWidth(text) + 6;
-         if (chipX + width > 195) { chipX = 15; y += 6; }
-         doc.setTextColor(0, 130, 70);
-         doc.text(text, chipX, y);
-         chipX += width;
-       });
-    });
-
-    // --- 4. RESULTADOS DE EVIDENCIAS ---
-    y += 15;
-    doc.setTextColor(50, 50, 50);
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
-    doc.text("RESULTADOS Y EVIDENCIAS CONSIGNADAS:", 15, y);
-    doc.setDrawColor(UNAD_BLUE[0], UNAD_BLUE[1], UNAD_BLUE[2]);
-    doc.line(15, y + 2, 60, y + 2);
-    
+    doc.text("DOCENTE:", margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(foundTeacher.name.toUpperCase(), margin + 50, y);
+    y += 7;
+
+    doc.setFont("helvetica", "bold");
+    doc.text("CÉDULA DE CIUDADANÍA:", margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(foundTeacher.identityCard, margin + 50, y);
+    y += 7;
+
+    doc.setFont("helvetica", "bold");
+    doc.text("CORREO INSTITUCIONAL:", margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(foundTeacher.email, margin + 50, y);
+    y += 7;
+
+    doc.setFont("helvetica", "bold");
+    doc.text("NIVEL DE INFORMACIÓN BASE:", margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(foundTeacher.educationLevel.toUpperCase(), margin + 50, y);
+    y += 15;
+
+    // --- BLOQUE 2: ALINEACIÓN ESTRATÉGICA ---
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("2. ALINEACIÓN ESTRATÉGICA", margin, y);
+    doc.line(margin, y + 2, 190, y + 2);
     y += 12;
-    fn.evidenceSchema?.forEach((field, idx) => {
-      const val = fn.evidenceData?.[field.id];
-      doc.setFontSize(8);
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("FUNCIÓN ASIGNADA:", margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(fn.name.toUpperCase(), margin + 50, y);
+    y += 7;
+
+    doc.setFont("helvetica", "bold");
+    doc.text("CATEGORÍA DOCUMENTAL:", margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(fn.category?.toUpperCase() || "N/A", margin + 50, y);
+    y += 7;
+
+    // Mapeo PDI
+    if (fn.pdiMappings && fn.pdiMappings.length > 0) {
       doc.setFont("helvetica", "bold");
-      doc.text(`${idx + 1}. ${field.label.toUpperCase()}:`, 15, y);
+      doc.text("ALINEACIÓN PDI:", margin, y);
       y += 5;
       doc.setFont("helvetica", "normal");
-      
-      if (field.type === 'text') {
-        const lines = doc.splitTextToSize(val as string || "No registra información técnica.", 175);
-        doc.text(lines, 20, y);
-        y += (lines.length * 4) + 6;
-      } else {
-        const name = (val as any)?.name || "Sin adjunto.";
-        doc.text(`> Soporte de Evidencia Digital: ${name}`, 20, y);
-        y += 8;
-      }
-
-      if (y > 260) { doc.addPage(); y = 30; }
-    });
-
-    // --- 5. PIE DE PÁGINA INSTITUCIONAL ---
-    const footerY = 275;
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text("Universidad Nacional Abierta y a Distancia UNAD", 15, footerY);
-    doc.text("Escuela de Ciencias de la Educación", 15, footerY + 4);
-    doc.text("Zona Occidente", 15, footerY + 8);
-
-    if (footerLogos) {
-      try {
-        doc.addImage(footerLogos, 'PNG', 120, footerY - 5, 75, 15);
-      } catch (e) { console.error(e); }
+      fn.pdiMappings.forEach(m => {
+        const label = PDI_LABELS[m.macroId] || `Macroproyecto ${m.macroId}`;
+        doc.text(`- ${label}`, margin + 5, y);
+        y += 5;
+      });
     }
 
-    doc.save(`INFORME_DOCENTE_${foundTeacher.identityCard}_${uniqueID}.pdf`);
+    y += 10;
+
+    // --- BLOQUE 3: EVIDENCIAS RADICADAS ---
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("3. EVIDENCIAS Y RESULTADOS", margin, y);
+    doc.line(margin, y + 2, 190, y + 2);
+    y += 15;
+
+    fn.evidenceSchema?.forEach((field, idx) => {
+      const val = fn.evidenceData?.[field.id];
+      
+      // Control de salto de página
+      if (y > 250) { doc.addPage(); y = 20; }
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${idx + 1}. ${field.label}`, margin, y);
+      y += 8;
+
+      if (field.type === 'text') {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        const text = typeof val === 'string' ? val : "No reportado.";
+        const lines = doc.splitTextToSize(text, 170);
+        doc.text(lines, margin + 5, y);
+        y += (lines.length * 5) + 10;
+      } else {
+        // Manejo de Archivos/Fotos/Enlaces
+        if (val && typeof val === 'object' && (val as any).data) {
+          const fileData = val as any;
+          if (fileData.type.includes('image')) {
+            try {
+              // Embeber fotografía directamente
+              doc.addImage(fileData.data, 'JPEG', margin + 5, y, 60, 45);
+              y += 55;
+            } catch (e) {
+              doc.text("[Error al embeber imagen]", margin + 5, y);
+              y += 10;
+            }
+          } else {
+            doc.setTextColor(0, 102, 204);
+            doc.text(`Enlace de acceso: ${fileData.name}`, margin + 5, y);
+            doc.setTextColor(0, 0, 0);
+            y += 10;
+          }
+        } else if (typeof val === 'string' && val.startsWith('http')) {
+          // Si el texto es un enlace de grabación
+          doc.setTextColor(0, 102, 204);
+          doc.text(`Enlace de grabación: ${val}`, margin + 5, y);
+          doc.setTextColor(0, 0, 0);
+          y += 10;
+        } else {
+          doc.setFont("helvetica", "italic");
+          doc.text("Evidencia adjunta en plataforma.", margin + 5, y);
+          y += 10;
+        }
+      }
+    });
+
+    // Pie de página final
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Documento generado electrónicamente por ${foundTeacher.name} el ${new Date().toLocaleDateString()}`, margin, 285);
+
+    doc.save(`INFORME_GESTION_${fn.name.replace(/\s+/g, '_')}.pdf`);
   };
 
-  /* 
-   * PROCESO DE REPORTE FINAL: ARCHIVADO Y NOTIFICACIÓN
-   */
-  const handleFinalReportAction = (fn: AssignedFunction) => {
-    if (!foundTeacher) return;
-
-    // 1. Generar automáticamente el Informe PDF
+  const finalizeReport = (fn: AssignedFunction) => {
+    if (!foundTeacher.profileCompleted) {
+      alert("⚠️ Error: Perfil incompleto. Certifique su información académica antes de radicar informes.");
+      setActiveSubTab('profile');
+      return;
+    }
     generateInstitutionalPDF(fn);
-
-    // 2. Actualizar estado y archivar virtualmente en Gestión Documental
-    setAssignedFunctions(prev => prev.map(f => {
-      if (f.id === fn.id) {
-        return { ...f, status: 'Entregado' };
-      }
-      return f;
-    }));
-
-    // 3. Notificación simulada de éxito y envío de correo
-    alert(`¡PROCESO DE REPORTE FINALIZADO!\n\n` +
-          `1. El informe ha sido generado y archivado en: ${fn.category || 'Gestión Académica'}.\n` +
-          `2. Se ha enviado una copia del informe al correo: ${foundTeacher.email}.\n` +
-          `3. La actividad "${fn.name}" ha sido marcada como REPORTADA en el metasistema.`);
-
-    setIsPreviewingPDF(null);
+    setAssignedFunctions(prev => prev.map(f => f.id === fn.id ? { ...f, status: 'Entregado' } : f));
     setShowEvidenceForm(null);
   };
 
-  const participatingPeriods = periods.filter(p => foundTeacher && p.participatingTeacherIds.includes(foundTeacher.id));
-
-  if (!foundTeacher) {
-    return (
-      <div className="max-w-2xl mx-auto mt-20 animate-in fade-in zoom-in-95 duration-1000">
-        <div className="bg-white rounded-[60px] shadow-3xl border border-slate-100 overflow-hidden">
-          <div className="mesh-gradient p-16 text-white text-center relative overflow-hidden">
-            <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 blur-[50px] rounded-full"></div>
-            <div className="p-6 bg-white/20 rounded-[35px] border border-white/30 shadow-2xl w-fit mx-auto mb-8">
-               <IdCard size={64} className="text-white opacity-90" />
-            </div>
-            <h2 className="text-4xl font-brand font-black tracking-tighter uppercase leading-tight">Terminal de Gestión<br/>Docente</h2>
-            <p className="text-indigo-100 font-bold uppercase text-[11px] tracking-[0.4em] mt-6 opacity-80">Identidad Digital • Acceso Institucional</p>
-          </div>
-          <div className="p-16 space-y-8">
-            <div className="space-y-3">
-               <label className="text-[11px] font-black uppercase text-slate-400 tracking-widest ml-2">Documento de Identidad</label>
-               <input type="text" placeholder="Ingrese su Cédula de Ciudadanía" className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-[30px] py-6 px-10 font-black text-xl text-slate-800 outline-none transition-all shadow-inner placeholder:text-slate-300" value={searchId} onChange={(e) => setSearchId(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
-            </div>
-            <button onClick={handleSearch} className="w-full bg-slate-900 text-white py-6 rounded-[35px] font-black text-xs uppercase tracking-[0.3em] hover:bg-indigo-600 shadow-3xl transition-all flex items-center justify-center gap-3">
-               Ingresar al Metasistema <ArrowRight size={20} />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const moocProgress = (localMOOC.certificationDate && localMOOC.evidence) ? 100 : 0;
 
   return (
-    <div className="space-y-12 pb-24 animate-in fade-in slide-in-from-right-10 duration-1000 max-w-[1400px] mx-auto">
+    <div className="space-y-12 animate-in fade-in duration-700 pb-20 max-w-[1600px] mx-auto">
       
-      {/* MODAL CONFIGURACIÓN PAPELERÍA */}
-      {showStationeryConfig && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-slate-900/95 backdrop-blur-2xl animate-in fade-in">
-           <div className="bg-white w-full max-w-2xl rounded-[50px] overflow-hidden shadow-4xl animate-in zoom-in-95">
-              <div className="p-10 border-b border-slate-100 flex items-center justify-between">
-                 <div className="flex items-center gap-4">
-                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl"><Settings size={24} /></div>
-                    <h3 className="text-2xl font-brand font-black tracking-tighter uppercase">Configurar Papelería Oficial</h3>
-                 </div>
-                 <button onClick={() => setShowStationeryConfig(false)}><XCircle size={32} className="text-slate-300 hover:text-red-500 transition-colors" /></button>
-              </div>
-              <div className="p-12 space-y-10">
-                 <div className="space-y-4">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2"><ImageIcon size={14} /> 1. Logo Superior (Captura de Plantilla)</label>
-                    <label className="flex flex-col items-center justify-center border-4 border-dashed border-slate-100 rounded-[35px] p-8 hover:bg-indigo-50 cursor-pointer bg-slate-50 group">
-                       <input type="file" className="hidden" accept="image/*" onChange={(e) => handleLogoUpload(e, 'header')} />
-                       {headerLogo ? <img src={headerLogo} className="h-20 object-contain" /> : <span className="text-[11px] font-black uppercase text-slate-400">Subir Logo Superior</span>}
-                    </label>
-                 </div>
-                 <div className="space-y-4">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2"><Stamp size={14} /> 2. Tira de Sellos Inferior</label>
-                    <label className="flex flex-col items-center justify-center border-4 border-dashed border-slate-100 rounded-[35px] p-8 hover:bg-indigo-50 cursor-pointer bg-slate-50 group">
-                       <input type="file" className="hidden" accept="image/*" onChange={(e) => handleLogoUpload(e, 'footer')} />
-                       {footerLogos ? <img src={footerLogos} className="h-16 object-contain" /> : <span className="text-[11px] font-black uppercase text-slate-400">Subir Tira de Sellos</span>}
-                    </label>
-                 </div>
-                 <button onClick={() => setShowStationeryConfig(false)} className="w-full bg-slate-900 text-white py-6 rounded-[30px] font-black text-xs uppercase tracking-widest shadow-xl hover:bg-indigo-600 transition-all">Guardar Configuración</button>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* MODAL: PREVISUALIZACIÓN DE INFORME CON INDICADORES ESTRATÉGICOS */}
-      {isPreviewingPDF && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-slate-900/90 backdrop-blur-xl animate-in fade-in">
-           <div className="bg-white w-full max-w-4xl rounded-[50px] overflow-hidden shadow-4xl animate-in zoom-in-95 flex flex-col h-[90vh]">
-              <div className="p-10 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-                 <div className="flex items-center gap-5">
-                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><Verified size={24} /></div>
-                    <div>
-                       <h3 className="text-2xl font-brand font-black tracking-tighter uppercase leading-none">Previsualización de Informe</h3>
-                       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">Revisión Final de Datos y Aportes</p>
-                    </div>
-                 </div>
-                 <button onClick={() => setIsPreviewingPDF(null)} className="hover:rotate-90 transition-transform text-slate-300"><XCircle size={32} /></button>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto p-12 bg-slate-100 custom-scrollbar">
-                 <div className="bg-white mx-auto shadow-2xl min-h-[1000px] w-full max-w-[800px] relative overflow-hidden p-16 flex flex-col border border-slate-200">
-                    <div className="flex justify-start mb-16">
-                       {headerLogo ? <img src={headerLogo} className="h-24 object-contain" /> : <div className="w-48 h-24 border-4 border-dashed border-slate-100 flex items-center justify-center text-[10px] font-black text-slate-300">LOGO UNAD</div>}
-                    </div>
-
-                    <div className="flex-1 space-y-12">
-                       <div className="text-center border-b-2 border-slate-100 pb-6">
-                          <h4 className="text-xl font-brand font-black text-slate-900 uppercase">Informe de Actividades Docentes</h4>
-                       </div>
-
-                       {/* CABECERA DE DATOS ESTRUCTURADA (SOLICITUD USUARIO) */}
-                       <div className="grid grid-cols-1 gap-6 bg-slate-50/50 p-10 rounded-3xl border border-slate-100">
-                          <div className="grid grid-cols-2 gap-10">
-                             <div>
-                                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Nombre del Docente</p>
-                                <p className="text-sm font-black text-slate-900 leading-tight">{foundTeacher.name.toUpperCase()}</p>
-                             </div>
-                             <div>
-                                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Identificación</p>
-                                <p className="text-sm font-black text-slate-900">{foundTeacher.identityCard}</p>
-                             </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-10">
-                             <div>
-                                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Periodo Académico</p>
-                                <p className="text-sm font-black text-slate-900 uppercase leading-tight">{periods.find(p => p.id === assignedFunctions.find(f => f.id === isPreviewingPDF)?.periodId)?.name}</p>
-                             </div>
-                             <div>
-                                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Actividad Maestra</p>
-                                <p className="text-sm font-black text-slate-900 uppercase leading-tight">{assignedFunctions.find(f => f.id === isPreviewingPDF)?.name}</p>
-                             </div>
-                          </div>
-                       </div>
-
-                       {/* INDICADORES DE IMPACTO (Chips en Informe) */}
-                       <div className="space-y-4">
-                          <p className="text-[10px] font-black uppercase text-indigo-600 tracking-widest border-b border-slate-50 pb-2">Indicadores de Impacto Estratégico</p>
-                          <div className="flex flex-wrap gap-3">
-                             {assignedFunctions.find(f => f.id === isPreviewingPDF)?.substantiveFunctions?.map(sf => (
-                                <span key={sf} className="px-4 py-2 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase rounded-xl border border-indigo-100 flex items-center gap-2"><Trophy size={14}/> {sf}</span>
-                             ))}
-                             {assignedFunctions.find(f => f.id === isPreviewingPDF)?.pdiMappings?.map(m => (
-                                <span key={m.macroId} className="px-4 py-2 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-xl border border-emerald-100 flex items-center gap-2"><Flag size={14}/> Proyecto {m.macroId}</span>
-                             ))}
-                          </div>
-                       </div>
-
-                       {/* RESULTADOS DE CAMPOS */}
-                       <div className="space-y-8">
-                          <p className="text-[10px] font-black uppercase text-indigo-600 tracking-widest border-b border-slate-50 pb-2">Resultados de Gestión Consignados</p>
-                          <div className="space-y-8">
-                             {assignedFunctions.find(f => f.id === isPreviewingPDF)?.evidenceSchema?.map((field, idx) => {
-                               const val = assignedFunctions.find(f => f.id === isPreviewingPDF)?.evidenceData?.[field.id];
-                               return (
-                                 <div key={field.id} className="space-y-2">
-                                    <p className="text-[11px] font-black text-slate-800 uppercase leading-none">{idx + 1}. {field.label}</p>
-                                    <div className="text-xs text-slate-600 leading-relaxed italic bg-slate-50/50 p-6 rounded-[28px] border border-slate-100">
-                                       {field.type === 'text' ? (val as string || 'Pendiente de información...') : (
-                                         <div className="flex items-center gap-3 text-emerald-600 font-bold">
-                                            <FileCheck size={18} /> Evidencia Digital: {(val as any)?.name}
-                                         </div>
-                                       )}
-                                    </div>
-                                 </div>
-                               );
-                             })}
-                          </div>
-                       </div>
-                    </div>
-
-                    {/* PIE DE PÁGINA (ESTILO CAPTURA) */}
-                    <div className="mt-20 flex justify-between items-end border-t border-slate-100 pt-10">
-                       <div className="space-y-1">
-                          <p className="text-[11px] font-bold text-slate-900 leading-tight">Universidad Nacional Abierta y a Distancia UNAD</p>
-                          <p className="text-[11px] font-bold text-slate-900 leading-tight">Escuela de Ciencias de la Educación</p>
-                          <p className="text-[11px] font-bold text-slate-900 leading-tight">Zona Occidente</p>
-                       </div>
-                       <div className="flex-1 flex justify-end">
-                          {footerLogos ? <img src={footerLogos} className="h-12 object-contain" /> : <div className="text-[8px] font-black text-slate-300 uppercase">Sellos Institucionales</div>}
-                       </div>
-                    </div>
-                 </div>
-              </div>
-
-              <div className="p-10 border-t border-slate-100 flex justify-end gap-6 bg-white shrink-0">
-                 <button onClick={() => setIsPreviewingPDF(null)} className="px-10 py-5 text-slate-400 font-black text-xs uppercase tracking-widest hover:text-slate-600">Cancelar</button>
-                 <button 
-                  onClick={() => {
-                    const fn = assignedFunctions.find(f => f.id === isPreviewingPDF);
-                    if (fn) handleFinalReportAction(fn);
-                  }}
-                  className="bg-[#004170] text-white px-12 py-5 rounded-3xl font-black text-xs uppercase tracking-[0.25em] hover:bg-emerald-600 transition-all shadow-3xl flex items-center gap-4"
-                >
-                    <Send size={18} /> REPORTAR EVIDENCIAS AL METASISTEMA
-                 </button>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* HEADER DE PERFIL */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 border-b border-slate-200 pb-12">
-        <div className="flex items-center gap-10">
-          <div className="relative group">
-             <img src={foundTeacher.imageUrl} className="w-32 h-32 rounded-[45px] object-cover shadow-3xl border-4 border-white ring-12 ring-indigo-50 transition-all" />
-             <div className="absolute -bottom-2 -right-2 p-3 bg-emerald-500 text-white rounded-2xl shadow-xl border-4 border-white">
+      {/* HEADER PRINCIPAL */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 bg-white p-10 rounded-[60px] shadow-sm border border-slate-100 relative overflow-hidden">
+         <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50 rounded-full blur-3xl opacity-50"></div>
+         <div className="flex items-center gap-8 relative z-10">
+            <div className="relative">
+              <img src={foundTeacher.imageUrl} className="w-32 h-32 rounded-[40px] object-cover shadow-2xl ring-8 ring-slate-50" />
+              <div className="absolute -bottom-2 -right-2 p-2.5 bg-emerald-500 text-white rounded-xl shadow-lg border-4 border-white">
                 <ShieldCheck size={20} />
-             </div>
-          </div>
-          <div>
-            <div className="flex items-center gap-3 mb-3">
-               <span className="bg-indigo-600 text-white text-[10px] font-black uppercase px-4 py-1.5 rounded-full tracking-[0.25em] shadow-lg">Perfil Académico Activo</span>
-               <button onClick={() => setShowStationeryConfig(true)} className="ml-4 p-2 bg-slate-900 text-white rounded-xl hover:bg-indigo-600 transition-all shadow-lg flex items-center gap-2 px-4">
-                  <Settings size={14} /> <span className="text-[10px] font-black uppercase tracking-widest">Papelería</span>
-               </button>
+              </div>
             </div>
-            <h1 className="text-5xl font-brand font-black text-slate-900 tracking-tighter uppercase">{foundTeacher.name}</h1>
-            <div className="flex items-center gap-3 mt-4 text-slate-400">
-               <span className="text-xs font-black uppercase tracking-[0.2em]">{foundTeacher.center}</span>
-               <div className="w-1.5 h-1.5 rounded-full bg-slate-200"></div>
-               <span className="text-xs font-black uppercase tracking-[0.2em]">Escuela de Ciencias de la Educación</span>
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                 <span className="bg-slate-900 text-white text-[9px] font-black uppercase px-4 py-1 rounded-full tracking-widest">Mi Autogestión</span>
+                 {foundTeacher.profileCompleted && !isEditingProfile && <span className="bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase px-4 py-1 rounded-full border border-indigo-100 flex items-center gap-2">Certificado <Verified size={10} /></span>}
+                 {isEditingProfile && <span className="bg-amber-50 text-amber-600 text-[9px] font-black uppercase px-4 py-1 rounded-full border border-amber-100 flex items-center gap-2">Modo Edición <Edit3 size={10} /></span>}
+              </div>
+              <h1 className="text-4xl font-brand font-black text-slate-900 tracking-tighter uppercase leading-tight">{foundTeacher.name}</h1>
+              <p className="text-slate-400 font-bold text-sm mt-1 flex items-center gap-2 uppercase tracking-tighter"><MapPin size={14} className="text-indigo-500" /> {foundTeacher.center}</p>
             </div>
-          </div>
-        </div>
-        <button onClick={() => {setFoundTeacher(null); setSearchId('');}} className="px-10 py-5 bg-white text-slate-400 border-2 border-slate-100 rounded-[30px] font-black text-xs uppercase tracking-[0.25em] hover:text-red-500 transition-all">Desconexión Segura</button>
+         </div>
+         
+         <div className="flex bg-slate-50 p-2 rounded-[30px] border border-slate-100 relative z-10">
+            <button 
+              onClick={() => setActiveSubTab('profile')} 
+              className={`flex items-center gap-3 px-8 py-4 rounded-[22px] text-[11px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'profile' ? 'bg-white text-indigo-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+               <User size={18} /> Perfil Profesional
+            </button>
+            <button 
+              onClick={() => setActiveSubTab('evidence')} 
+              className={`flex items-center gap-3 px-8 py-4 rounded-[22px] text-[11px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'evidence' ? 'bg-white text-indigo-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+               <ClipboardList size={18} /> Evidencias de Gestión
+            </button>
+         </div>
       </div>
 
-      {/* LISTA DE FUNCIONES Y PROGRESO */}
-      <div className="space-y-16">
-        {participatingPeriods.map(period => (
-          <div key={period.id} className={`bg-white rounded-[65px] border-2 transition-all overflow-hidden ${period.status === 'Cerrado' ? 'border-slate-100 grayscale opacity-70' : 'border-indigo-50 shadow-3xl shadow-indigo-500/5'}`}>
-             <div className="p-12 bg-slate-50/50 flex flex-col md:flex-row items-center justify-between border-b gap-8">
-                <div className="flex items-center gap-6">
-                   <div className="p-5 bg-slate-900 text-white rounded-[32px] shadow-2xl"><Layers size={32} /></div>
+      {activeSubTab === 'profile' ? (
+        /* 
+         * =========================================================================================
+         * !!! ATENCIÓN - MÓDULO DE PERFIL PROFESIONAL (SUB-MÓDULO FINALIZADO) !!!
+         * -----------------------------------------------------------------------------------------
+         * ESTE BLOQUE DE CÓDIGO HA SIDO DECLARADO COMO "ESTÁTICO" E "INMUTABLE" POR REQUERIMIENTO.
+         * NO REALIZAR MODIFICACIONES, CAMBIOS DE ESTILO O DE LÓGICA EN ESTA SECCIÓN.
+         * LA ARQUITECTURA DE ESTOS BLOQUES ES DEFINITIVA.
+         * =========================================================================================
+         */
+        <div className="space-y-12 animate-in slide-in-from-bottom-6 duration-700">
+          
+          {/* BLOQUE 1: FICHA ADMINISTRATIVA (PERMANENTEMENTE BLOQUEADA) */}
+          <div className="bg-white rounded-[65px] border border-slate-100 shadow-2xl overflow-hidden relative">
+             <div className="absolute top-6 right-10 flex items-center gap-2 bg-slate-100/50 px-4 py-2 rounded-full">
+                <Lock size={12} className="text-slate-400" />
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Información Protegida</span>
+             </div>
+             <div className="p-12 mesh-gradient text-white flex items-center gap-8">
+                <div className="p-5 bg-white/10 rounded-[35px] border border-white/20 shadow-2xl"><Binary size={40} /></div>
+                <div>
+                   <h2 className="text-4xl font-brand font-black tracking-tighter uppercase leading-none">Ficha Administrativa</h2>
+                   <p className="text-indigo-100 text-[10px] font-black uppercase tracking-[0.3em] mt-3">Identidad Institucional ECE</p>
+                </div>
+             </div>
+             <div className="p-16 grid grid-cols-1 md:grid-cols-3 gap-10 bg-slate-50/20">
+                <div className="p-8 bg-white rounded-[45px] border border-slate-100 shadow-sm opacity-80">
+                   <div className="flex items-center gap-4 mb-4">
+                      <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl"><Fingerprint size={20} /></div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cédula de Ciudadanía</p>
+                   </div>
+                   <p className="text-2xl font-brand font-black text-slate-700">{foundTeacher.identityCard}</p>
+                </div>
+                <div className="p-8 bg-white rounded-[45px] border border-slate-100 shadow-sm opacity-80">
+                   <div className="flex items-center gap-4 mb-4">
+                      <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><Mail size={20} /></div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Correo Institucional</p>
+                   </div>
+                   <p className="text-sm font-bold text-slate-700 truncate">{foundTeacher.email}</p>
+                </div>
+                <div className="p-8 bg-white rounded-[45px] border border-slate-100 shadow-sm opacity-80">
+                   <div className="flex items-center gap-4 mb-4">
+                      <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl"><Shield size={20} /></div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nivel Base</p>
+                   </div>
+                   <p className="text-lg font-bold text-slate-700 uppercase">{foundTeacher.educationLevel}</p>
+                </div>
+             </div>
+          </div>
+
+          {/* BLOQUE 2: TÍTULOS ACADÉMICOS (DESBLOQUEABLE) */}
+          <div className={`bg-white rounded-[65px] border border-slate-100 shadow-2xl overflow-hidden transition-all duration-500 ${!isEditingProfile ? 'opacity-90 grayscale-[0.5]' : ''}`}>
+             <div className="p-12 mesh-gradient text-white flex flex-col md:flex-row items-center justify-between gap-8">
+                <div className="flex items-center gap-8">
+                   <div className="p-5 bg-white/10 rounded-[35px] border border-white/20 shadow-2xl"><Award size={40} /></div>
                    <div>
-                      <h3 className="font-brand font-black text-3xl tracking-tighter uppercase text-slate-900 leading-none">{period.name}</h3>
-                      <p className="text-xs font-black uppercase text-indigo-500 tracking-[0.3em] mt-2">Bitácora de Informes Estratégicos</p>
+                      <h2 className="text-4xl font-brand font-black tracking-tighter uppercase leading-none">Títulos y Grados Académicos</h2>
+                      <p className="text-indigo-100 text-[10px] font-black uppercase tracking-[0.3em] mt-3">Historial Profesional de Formación</p>
                    </div>
                 </div>
-                <div className="px-8 py-4 rounded-[28px] text-[11px] font-black uppercase tracking-widest flex items-center gap-3 bg-emerald-500 text-white shadow-xl">
-                   <Zap size={16} fill="currentColor"/> Ciclo Académico Activo
+                {isEditingProfile && (
+                  <div className="flex flex-wrap gap-2 justify-center animate-in zoom-in-95">
+                    {(['Pregrado', 'Especialización', 'Maestría', 'Doctorado', 'Posdoctorado'] as const).map(lvl => (
+                      <button key={lvl} onClick={() => {
+                        const newDeg: AcademicDegree = { id: `deg-${Date.now()}`, level: lvl, title: '' };
+                        setLocalDegrees([...localDegrees, newDeg]);
+                      }} className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white text-[9px] font-black uppercase rounded-[20px] transition-all border border-white/20 shadow-lg">+ {lvl}</button>
+                    ))}
+                  </div>
+                )}
+             </div>
+             <div className="p-16 bg-slate-50/20">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                   {localDegrees.map(deg => (
+                     <div key={deg.id} className="bg-white p-8 rounded-[45px] border-2 border-slate-100 shadow-sm flex items-center justify-between group hover:border-indigo-100 transition-all">
+                        <div className="flex-1 mr-4">
+                           <div className="flex items-center gap-3 mb-2">
+                              <GraduationCap size={16} className="text-indigo-400" />
+                              <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">{deg.level}</p>
+                           </div>
+                           <input 
+                             disabled={!isEditingProfile}
+                             type="text" 
+                             className={`w-full bg-transparent border-none outline-none font-black text-slate-800 text-base uppercase placeholder:text-slate-200 ${!isEditingProfile ? 'cursor-not-allowed' : ''}`} 
+                             value={deg.title} 
+                             onChange={(e) => setLocalDegrees(prev => prev.map(d => d.id === deg.id ? { ...d, title: e.target.value } : d))} 
+                             placeholder="Denominación del título..." 
+                           />
+                        </div>
+                        {isEditingProfile && <button onClick={() => setLocalDegrees(prev => prev.filter(d => d.id !== deg.id))} className="p-3 text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={20} /></button>}
+                     </div>
+                   ))}
+                   {localDegrees.length === 0 && (
+                     <div className="col-span-full py-20 text-center text-slate-300 italic font-black uppercase text-[10px] tracking-[0.3em] border-4 border-dashed border-slate-100 rounded-[50px]">Sin títulos registrados</div>
+                   )}
+                </div>
+             </div>
+          </div>
+
+          {/* BLOQUE 3: NIVEL DE INGLÉS (DESBLOQUEABLE) */}
+          <div className={`bg-white rounded-[65px] border border-slate-100 shadow-2xl overflow-hidden transition-all duration-500 ${!isEditingProfile ? 'opacity-90 grayscale-[0.5]' : ''}`}>
+             <div className="p-12 mesh-gradient text-white flex items-center gap-8">
+                <div className="p-5 bg-white/10 rounded-[35px] border border-white/20 shadow-2xl"><Globe size={40} /></div>
+                <div>
+                   <h2 className="text-4xl font-brand font-black tracking-tighter uppercase leading-none">Competencia en Lengua Extranjera</h2>
+                   <p className="text-indigo-100 text-[10px] font-black uppercase tracking-[0.3em] mt-3">Marco Común Europeo de Referencia (MCE)</p>
+                </div>
+             </div>
+             <div className="p-16 bg-slate-50/20">
+                <div className="max-w-4xl mx-auto grid grid-cols-3 md:grid-cols-6 gap-6">
+                   {LANGUAGE_LEVELS.map(lvl => (
+                     <button 
+                       key={lvl} 
+                       disabled={!isEditingProfile}
+                       onClick={() => setLocalLanguage(lvl)} 
+                       className={`py-10 rounded-[45px] font-black text-3xl transition-all border-4 ${localLanguage === lvl ? 'bg-slate-900 border-slate-900 text-white shadow-2xl scale-110' : 'bg-white border-slate-100 text-slate-200 hover:border-indigo-100'} ${!isEditingProfile ? 'cursor-not-allowed opacity-80' : ''}`}
+                     >
+                        {lvl}
+                     </button>
+                   ))}
+                </div>
+             </div>
+          </div>
+
+          {/* BLOQUE 4: RUTA FORMADOR DE FORMADORES (DESBLOQUEABLE) */}
+          <div className={`animate-in slide-in-from-bottom-8 duration-700 bg-white rounded-[65px] border border-slate-100 shadow-2xl overflow-hidden transition-all duration-500 ${!isEditingProfile ? 'opacity-90 grayscale-[0.5]' : ''}`}>
+             <div className="p-12 mesh-gradient text-white flex flex-col md:flex-row items-center justify-between gap-8">
+                <div className="flex items-center gap-8">
+                   <div className="p-5 bg-white/10 rounded-[35px] border border-white/20 shadow-2xl"><GitMerge size={40} /></div>
+                   <div>
+                      <h2 className="text-4xl font-brand font-black tracking-tighter uppercase leading-none">Ruta Formador de Formadores</h2>
+                      <p className="text-indigo-100 text-[10px] font-black uppercase tracking-[0.3em] mt-3">Monitor de Cualificación Técnica ECE</p>
+                   </div>
+                </div>
+                <div className="bg-white/10 p-5 rounded-3xl border border-white/10 flex flex-col items-center min-w-[200px]">
+                   <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Registros Completos</span>
+                   <span className="text-3xl font-brand font-black">{localRoute.filter(lr => lr.certificationDate && lr.evidence).length} / {OFFICIAL_DIPLOMAS.length}</span>
                 </div>
              </div>
 
-             <div className="p-12 space-y-12">
-                {assignedFunctions.filter(f => f.periodId === period.id && f.teacherId === foundTeacher.id).map(fn => {
-                  const progress = calculateProgress(fn);
-                  return (
-                    <div key={fn.id} className="bg-white border-2 border-slate-50 rounded-[55px] overflow-hidden hover:shadow-4xl transition-all shadow-md border-l-[12px] border-l-indigo-600">
-                       <div className="p-14 flex flex-col lg:flex-row items-start justify-between gap-16">
-                          <div className="flex-1 space-y-10">
-                             <div className="space-y-4">
-                                <div className="flex flex-wrap items-center gap-5">
-                                   <h4 className="font-brand font-black text-3xl text-slate-900 tracking-tighter uppercase leading-tight">{fn.name}</h4>
-                                   <div className="flex gap-2">
-                                      {fn.substantiveFunctions?.map(f => (
-                                        <span key={f} className="bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase px-4 py-1.5 rounded-full border border-indigo-100">{f}</span>
-                                      ))}
-                                   </div>
-                                </div>
-                                <p className="text-base text-slate-500 font-medium italic leading-relaxed max-w-4xl">{fn.description}</p>
-                             </div>
-                             
-                             <div className="flex flex-wrap gap-5">
-                                <button onClick={() => setShowEvidenceForm(showEvidenceForm === fn.id ? null : fn.id)} className={`flex items-center gap-3 text-[11px] font-black uppercase px-8 py-5 rounded-[28px] transition-all ${showEvidenceForm === fn.id ? 'bg-emerald-600 text-white shadow-3xl scale-105' : 'bg-emerald-50 text-emerald-600 border-2 border-emerald-100 hover:bg-emerald-100 shadow-sm'}`}>
-                                   <FileText size={22} /> {progress === 100 ? 'Revisar Informe Completo' : 'Gestionar Informe de Evidencias'}
+             <div className="p-16 space-y-20 bg-slate-50/20">
+                <div className="space-y-10">
+                   <div className="flex items-center gap-4 border-b border-slate-100 pb-6">
+                      <div className="p-3 bg-white shadow-sm rounded-xl text-indigo-600"><Search size={20}/></div>
+                      <h3 className="text-xl font-brand font-black text-slate-800 uppercase tracking-tighter">Catálogo de Diplomados Oficiales</h3>
+                   </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {OFFICIAL_DIPLOMAS.map(diploma => {
+                        const registration = localRoute.find(i => i.diplomaName === diploma);
+                        const isSelected = !!registration;
+                        return (
+                          <div key={diploma} className={`p-6 rounded-[40px] border-2 transition-all flex flex-col gap-6 ${isSelected ? 'bg-white border-indigo-600 shadow-xl' : 'bg-white border-slate-100 grayscale-[0.6] opacity-60'}`}>
+                             <div className="flex items-start justify-between">
+                                <button 
+                                  disabled={!isEditingProfile}
+                                  onClick={() => toggleDiploma(diploma)} 
+                                  className={`text-[10px] font-black uppercase tracking-tight flex-1 mr-4 text-left ${isSelected ? 'text-indigo-600' : 'text-slate-400'} ${!isEditingProfile ? 'cursor-not-allowed' : ''}`}
+                                >
+                                   {diploma}
                                 </button>
+                                {isSelected ? <CheckCircle2 size={18} className="text-indigo-600" /> : <Plus size={18} className="text-slate-200" />}
+                             </div>
+                             {isSelected && (
+                               <div className="space-y-4 animate-in zoom-in-95">
+                                  <div>
+                                     <label className="text-[8px] font-black uppercase text-slate-400 mb-2 block">Fecha Certificación</label>
+                                     <input 
+                                       disabled={!isEditingProfile}
+                                       type="date" 
+                                       className={`w-full bg-slate-50 border border-slate-100 rounded-xl py-2 px-3 text-[10px] font-bold outline-none ${!isEditingProfile ? 'cursor-not-allowed opacity-70' : ''}`} 
+                                       value={registration.certificationDate} 
+                                       onChange={(e) => updateDiplomaDate(diploma, e.target.value)} 
+                                     />
+                                  </div>
+                                  <div>
+                                     <label className="text-[8px] font-black uppercase text-slate-400 mb-2 block">Cargar Soporte (PDF/IMG)</label>
+                                     <label className={`flex items-center justify-center p-3 rounded-xl border-2 border-dashed transition-all ${registration.evidence ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-400'} ${!isEditingProfile ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                                        <input disabled={!isEditingProfile} type="file" className="hidden" onChange={(e) => handleDiplomaEvidence(diploma, e)} />
+                                        {registration.evidence ? <div className="flex items-center gap-2"><FileCheck size={14} /><span className="text-[8px] font-black uppercase truncate max-w-[80px]">{registration.evidence.name}</span></div> : <Upload size={14} />}
+                                     </label>
+                                  </div>
+                               </div>
+                             )}
+                          </div>
+                        );
+                      })}
+                   </div>
+                </div>
+
+                <div className="space-y-10">
+                   <div className="flex items-center gap-4 border-b border-slate-100 pb-6">
+                      <div className="p-3 bg-white shadow-sm rounded-xl text-emerald-600"><Trophy size={20}/></div>
+                      <h3 className="text-xl font-brand font-black text-slate-800 uppercase tracking-tighter">Balance de Evolución por Rol</h3>
+                   </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
+                      {FORMATION_ROLES.map(role => {
+                        const required = role.diplomas;
+                        const completed = required.filter(d => localRoute.some(lr => lr.diplomaName === d && lr.certificationDate && lr.evidence));
+                        const percent = Math.round((completed.length / required.length) * 100);
+                        const isFull = percent === 100;
+                        return (
+                          <div key={role.name} className={`p-8 rounded-[50px] border-2 transition-all flex flex-col h-full relative overflow-hidden ${isFull ? 'bg-emerald-50 border-emerald-500 shadow-2xl' : 'bg-white border-slate-100 shadow-sm'}`}>
+                             <div className="flex items-center justify-between mb-8">
+                                <div className={`p-4 rounded-[22px] ${isFull ? 'bg-emerald-500 text-white' : 'bg-slate-50 text-slate-300'}`}>{role.icon}</div>
+                                <div className="text-right"><h4 className={`text-2xl font-brand font-black ${isFull ? 'text-emerald-600' : 'text-slate-800'}`}>{percent}%</h4></div>
+                             </div>
+                             <h5 className="text-sm font-black uppercase text-slate-800 mb-6">{role.name}</h5>
+                             <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden mb-8">
+                                <div className={`h-full transition-all duration-1000 ${isFull ? 'bg-emerald-500' : 'bg-indigo-600'}`} style={{ width: `${percent}%` }}></div>
+                             </div>
+                             <div className="space-y-2 flex-1">
+                                {required.map(d => {
+                                   const hasIt = localRoute.some(lr => lr.diplomaName === d && lr.certificationDate && lr.evidence);
+                                   return (
+                                     <div key={d} className={`flex items-center gap-2 p-2 rounded-xl transition-all ${hasIt ? 'bg-emerald-100/50' : 'opacity-30'}`}>
+                                        {hasIt ? <CheckCircle2 size={12} className="text-emerald-600" /> : <div className="w-2 h-2 rounded-full border border-slate-400" />}
+                                        <span className={`text-[8px] font-black uppercase ${hasIt ? 'text-emerald-800' : 'text-slate-500'}`}>{d}</span>
+                                     </div>
+                                   );
+                                })}
                              </div>
                           </div>
+                        );
+                      })}
+                   </div>
+                </div>
+             </div>
+          </div>
 
-                          <div className="w-full lg:w-96 p-10 bg-slate-50/70 rounded-[45px] border border-slate-100 space-y-8">
-                             <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                   <span className="text-[11px] font-black uppercase text-slate-400 tracking-[0.2em]">Cargue de Informe</span>
-                                   <span className={`text-[14px] font-black uppercase ${progress === 100 ? 'text-emerald-500' : 'text-indigo-600'}`}>{progress}%</span>
-                                </div>
-                                <div className="h-5 w-full bg-slate-200 rounded-full overflow-hidden shadow-inner ring-4 ring-white">
-                                   <div className={`h-full transition-all duration-1000 ${progress === 100 ? 'bg-emerald-500 shadow-xl' : 'bg-indigo-600 shadow-xl'}`} style={{ width: `${progress}%` }}></div>
-                                </div>
-                             </div>
-                             <div className={`flex items-center gap-5 p-6 rounded-[32px] border-2 transition-all ${fn.status === 'Entregado' ? 'bg-emerald-500 border-emerald-500 text-white shadow-2xl' : 'bg-white border-orange-100 text-orange-500 shadow-sm'}`}>
-                                {fn.status === 'Entregado' ? <CheckCircle2 size={32} strokeWidth={3}/> : <Clock size={32} strokeWidth={3}/>}
-                                <div>
-                                   <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 leading-none mb-2">Estado del Proceso</p>
-                                   <p className="text-lg font-brand font-black uppercase tracking-widest leading-none">{fn.status === 'Entregado' ? 'REPORTADO' : 'PENDIENTE'}</p>
-                                </div>
-                             </div>
-                          </div>
-                       </div>
+          {/* BLOQUE 5: MOOC DE INGRESO DOCENTE (DESBLOQUEABLE) */}
+          <div className={`animate-in slide-in-from-bottom-12 duration-700 bg-white rounded-[65px] border border-slate-100 shadow-2xl overflow-hidden transition-all duration-500 ${!isEditingProfile ? 'opacity-90 grayscale-[0.5]' : ''}`}>
+             <div className="p-12 mesh-gradient text-white flex flex-col md:flex-row items-center justify-between gap-8">
+                <div className="flex items-center gap-8">
+                   <div className="p-5 bg-white/10 rounded-[35px] border border-white/20 shadow-2xl"><BookOpen size={40} /></div>
+                   <div>
+                      <h2 className="text-4xl font-brand font-black tracking-tighter uppercase leading-none">MOOC de Ingreso Docente</h2>
+                      <p className="text-indigo-100 text-[10px] font-black uppercase tracking-[0.3em] mt-3">Requisito Obligatorio de Vinculación</p>
+                   </div>
+                </div>
+             </div>
 
-                       {showEvidenceForm === fn.id && (
-                         <div className="bg-emerald-50/40 p-16 border-t border-emerald-100 animate-in slide-in-from-top-4">
-                            <div className="grid grid-cols-1 gap-12 max-w-6xl mx-auto">
-                               {fn.evidenceSchema?.map(field => {
-                                 const currentValue = fn.evidenceData?.[field.id];
-                                 return (
-                                   <div key={field.id} className="space-y-6 bg-white p-12 rounded-[50px] border border-emerald-100 shadow-xl relative overflow-hidden group">
-                                      <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 -mr-16 -mt-16 rounded-full group-hover:scale-110 transition-transform"></div>
-                                      <label className="flex items-center justify-between text-xl font-brand font-black text-slate-800 tracking-tight relative z-10">
-                                         <span className="flex items-center gap-4">
-                                           <div className={`p-2.5 rounded-xl ${field.type === 'text' ? 'bg-indigo-50 text-indigo-500' : 'bg-emerald-50 text-emerald-500'}`}>
-                                              {field.type === 'text' ? <Type size={22}/> : <Paperclip size={22}/>}
-                                           </div>
-                                           {field.label}
-                                         </span>
-                                         {field.required && <span className="text-red-500 text-[10px] font-black uppercase bg-red-50 px-5 py-2 rounded-full border border-red-100 tracking-widest shadow-sm">Requerido</span>}
-                                      </label>
-                                      
-                                      {field.type === 'text' ? (
-                                        <textarea 
-                                          rows={5}
-                                          className="w-full bg-slate-50 border-4 border-transparent focus:border-emerald-500 rounded-[35px] py-8 px-10 font-bold text-base text-slate-700 outline-none transition-all shadow-inner relative z-10 placeholder:text-slate-300"
-                                          placeholder={field.placeholder}
-                                          value={currentValue as string || ''}
-                                          onChange={(e) => handleUpdateEvidence(fn.id, field.id, e.target.value)}
-                                        />
-                                      ) : (
-                                        <div className="flex items-center gap-10 relative z-10">
-                                           <label className="flex-1 flex flex-col items-center justify-center border-4 border-dashed border-slate-100 rounded-[45px] p-16 hover:bg-emerald-50 hover:border-emerald-300 transition-all cursor-pointer bg-slate-50 group/drop relative overflow-hidden">
-                                              <input type="file" className="hidden" onChange={(e) => {
-                                                const file = e.target.files?.[0];
-                                                if (file) handleUpdateEvidence(fn.id, field.id, { name: file.name, size: (file.size / 1024).toFixed(1) + ' KB' });
-                                              }} />
-                                              {currentValue ? (
-                                                <div className="flex flex-col md:flex-row items-center gap-8 animate-in zoom-in-95">
-                                                   <div className="p-8 bg-emerald-600 text-white rounded-[35px] shadow-3xl"><FileCheck size={56} /></div>
-                                                   <div className="text-center md:text-left">
-                                                      <p className="text-2xl font-brand font-black text-slate-900 leading-none mb-3">{(currentValue as any).name}</p>
-                                                      <p className="text-xs font-black uppercase text-emerald-600 tracking-[0.3em]">Archivo Soporte Cargado ({(currentValue as any).size})</p>
+             <div className="p-16 bg-slate-50/30">
+                <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-xl flex flex-col lg:flex-row items-center gap-12">
+                   <div className="flex-1 space-y-6">
+                      <div className="flex items-center gap-4">
+                         <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl"><Award size={28} /></div>
+                         <h3 className="text-2xl font-brand font-black text-slate-800 uppercase tracking-tighter leading-tight">{localMOOC.diplomaName}</h3>
+                      </div>
+                      
+                      <div className="pt-6">
+                         <div className="flex items-center justify-between text-[10px] font-black uppercase text-slate-400 mb-3">
+                            <span>Estado del Requisito</span>
+                            <span>{moocProgress}%</span>
+                         </div>
+                         <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                            <div className={`h-full transition-all duration-1000 ${moocProgress === 100 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${moocProgress}%` }}></div>
+                         </div>
+                      </div>
+                   </div>
+
+                   <div className="w-full lg:w-96 p-10 bg-slate-50 rounded-[45px] border border-slate-100 space-y-8">
+                      <div className="space-y-4">
+                         <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1 flex items-center gap-2"><Calendar size={14} /> Fecha de Certificación</label>
+                         <input 
+                           disabled={!isEditingProfile}
+                           type="date" 
+                           className={`w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-sm font-bold outline-none focus:border-indigo-500 ${!isEditingProfile ? 'cursor-not-allowed opacity-70' : ''}`} 
+                           value={localMOOC.certificationDate} 
+                           onChange={(e) => setLocalMOOC({ ...localMOOC, certificationDate: e.target.value })} 
+                         />
+                      </div>
+                      <div className="space-y-4">
+                         <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1 flex items-center gap-2"><Paperclip size={14} /> Carga de Evidencia</label>
+                         <label className={`w-full flex flex-col items-center justify-center py-8 rounded-[35px] border-4 border-dashed transition-all ${localMOOC.evidence ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-white border-slate-200 text-slate-300 hover:border-indigo-400'} ${!isEditingProfile ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                            <input disabled={!isEditingProfile} type="file" className="hidden" onChange={handleMOOCEvidence} />
+                            {localMOOC.evidence ? (
+                              <div className="text-center">
+                                 <FileCheck size={32} className="mx-auto mb-2" />
+                                 <span className="text-[9px] font-black uppercase">{localMOOC.evidence.name}</span>
+                              </div>
+                            ) : (
+                              <div className="text-center">
+                                 <Upload size={32} className="mx-auto mb-2" />
+                                 <span className="text-[9px] font-black uppercase">Subir Documento</span>
+                              </div>
+                            )}
+                         </label>
+                      </div>
+                   </div>
+                </div>
+             </div>
+
+             <div className="p-12 flex justify-center border-t border-slate-100 bg-white">
+                {!isEditingProfile ? (
+                  <button onClick={handleEditProfile} className="bg-slate-900 text-white px-24 py-8 rounded-[45px] font-black text-xs uppercase tracking-[0.4em] hover:bg-indigo-600 shadow-4xl transition-all flex items-center gap-6">
+                    <Edit3 size={32} /> EDITAR MI PERFIL
+                  </button>
+                ) : (
+                  <button onClick={handleCertifyProfile} className="bg-emerald-600 text-white px-24 py-8 rounded-[45px] font-black text-xs uppercase tracking-[0.4em] hover:bg-slate-900 shadow-4xl transition-all flex items-center gap-6">
+                    <ShieldCheck size={32} /> CERTIFICAR MI PERFIL
+                  </button>
+                )}
+             </div>
+          </div>
+        </div>
+      ) : (
+        /* GESTIÓN DE EVIDENCIAS Y GENERACIÓN DE INFORME ESTRUCTURADO */
+        <div className="space-y-12 animate-in slide-in-from-right-4 duration-500">
+           {participatingPeriods.length === 0 ? (
+             <div className="bg-white rounded-[60px] p-24 text-center border-4 border-dashed border-slate-100 flex flex-col items-center">
+                <History size={64} className="text-slate-200 mb-6" />
+                <h3 className="text-2xl font-brand font-black text-slate-300 uppercase tracking-tighter">Periodo No Habilitado</h3>
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.3em] mt-2">Su carga académica no ha sido vinculada.</p>
+             </div>
+           ) : (
+             participatingPeriods.map(period => (
+               <div key={period.id} className="bg-white rounded-[60px] border border-slate-100 shadow-sm overflow-hidden mb-12">
+                  <div className="p-10 bg-slate-900 text-white flex flex-col md:flex-row items-center justify-between gap-8">
+                     <div className="flex items-center gap-6">
+                        <div className="p-4 bg-white/10 rounded-[28px] border border-white/20 shadow-2xl"><Layers size={28} /></div>
+                        <div>
+                           <h3 className="font-brand font-black text-2xl tracking-tighter uppercase leading-none">{period.name}</h3>
+                           <p className="text-[10px] font-bold uppercase text-indigo-400 tracking-widest mt-2">Ciclo de Operación</p>
+                        </div>
+                     </div>
+                     <div className="bg-white/10 px-6 py-3 rounded-full border border-white/10 flex items-center gap-3">
+                        <Activity size={16} className="text-emerald-400" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Activo</span>
+                     </div>
+                  </div>
+
+                  <div className="p-10 space-y-6 bg-slate-50/30">
+                     {assignedFunctions.filter(f => f.periodId === period.id && f.teacherId === foundTeacher.id).map(fn => {
+                       const progress = calculateProgress(fn);
+                       const isDelivered = fn.status === 'Entregado';
+                       return (
+                         <div key={fn.id} className={`bg-white border-2 rounded-[45px] overflow-hidden transition-all shadow-sm ${isDelivered ? 'border-emerald-100 grayscale-[0.3]' : 'border-slate-100 hover:border-indigo-100 hover:shadow-2xl'}`}>
+                            <div className="p-10 flex flex-col lg:flex-row items-center justify-between gap-10">
+                               <div className="flex-1 space-y-4">
+                                  <div className="flex items-center gap-4">
+                                     <h4 className="font-brand font-black text-2xl text-slate-800 uppercase tracking-tighter leading-tight">{fn.name}</h4>
+                                     {isDelivered && <div className="flex items-center gap-2 px-4 py-1.5 bg-emerald-500 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest"><Verified size={14} /> Radicado ✓</div>}
+                                  </div>
+                                  <div className="flex items-center gap-3 mb-2">
+                                     <div className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[8px] font-black uppercase tracking-widest border border-indigo-100 flex items-center gap-2"><Target size={12} /> Alineación PDI Activa</div>
+                                     <div className="px-3 py-1 bg-cyan-50 text-cyan-600 rounded-lg text-[8px] font-black uppercase tracking-widest border border-cyan-100 flex items-center gap-2"><LayoutGrid size={12} /> Carpeta: {fn.category}</div>
+                                  </div>
+                                  <p className="text-sm text-slate-500 font-medium italic leading-relaxed max-w-3xl line-clamp-2">{fn.description}</p>
+                                  <div className="flex flex-wrap gap-4 pt-4">
+                                     {isDelivered ? (
+                                        <button onClick={() => generateInstitutionalPDF(fn)} className="flex items-center gap-3 text-[10px] font-black uppercase px-8 py-4 rounded-[25px] bg-slate-900 text-white shadow-xl hover:scale-105 transition-all">
+                                          <Download size={20} /> Descargar Informe Oficial
+                                        </button>
+                                     ) : (
+                                        <button 
+                                          onClick={() => setShowEvidenceForm(showEvidenceForm === fn.id ? null : fn.id)} 
+                                          className={`flex items-center gap-4 text-[10px] font-black uppercase px-10 py-5 rounded-[30px] transition-all shadow-xl ${
+                                            showEvidenceForm === fn.id ? 'bg-slate-900 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                          }`}
+                                        >
+                                           {showEvidenceForm === fn.id ? 'Cerrar Formulario' : progress === 100 ? 'REVISAR Y RADICAR' : 'DILIGENCIAR EVIDENCIAS'}
+                                        </button>
+                                     )}
+                                  </div>
+                               </div>
+                               <div className="w-full lg:w-72 space-y-4">
+                                  <div className="flex items-center justify-between text-[10px] font-black uppercase text-slate-400">
+                                     <span>Avance del Informe</span>
+                                     <span className={progress === 100 ? 'text-emerald-500' : 'text-indigo-600'}>{progress}%</span>
+                                  </div>
+                                  <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                                     <div className={`h-full transition-all duration-1000 ${isDelivered ? 'bg-emerald-500' : 'bg-indigo-600'}`} style={{ width: `${progress}%` }}></div>
+                                  </div>
+                               </div>
+                            </div>
+
+                            {showEvidenceForm === fn.id && !isDelivered && (
+                              <div className="bg-slate-50/80 p-12 border-t border-slate-100 animate-in slide-in-from-top-4">
+                                 <div className="max-w-4xl mx-auto space-y-10">
+                                    <div className="grid grid-cols-1 gap-8">
+                                       {fn.evidenceSchema?.map((field) => {
+                                         const currentValue = fn.evidenceData?.[field.id];
+                                         const isLink = typeof currentValue === 'string' && currentValue.startsWith('http');
+                                         return (
+                                           <div key={field.id} className="bg-white p-10 rounded-[40px] border border-slate-100 shadow-sm space-y-6 group">
+                                              <label className="flex items-center justify-between text-xl font-brand font-black text-slate-800 uppercase tracking-tighter">
+                                                 <div className="flex items-center gap-4">
+                                                   {field.type === 'text' ? <Link size={20} className="text-indigo-500" /> : <ImageIcon size={20} className="text-emerald-500" />}
+                                                   {field.label}
+                                                 </div>
+                                                 {currentValue && <Verified size={24} className="text-emerald-500" />}
+                                              </label>
+                                              {field.type === 'text' ? (
+                                                <div className="space-y-4">
+                                                   <textarea rows={4} className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-[30px] py-6 px-8 font-bold text-sm text-slate-700 outline-none transition-all shadow-inner" placeholder="Escriba aquí el enlace de grabación o descripción..." value={typeof currentValue === 'string' ? currentValue : ''} onChange={(e) => setAssignedFunctions(prev => prev.map(f => f.id === fn.id ? { ...f, evidenceData: { ...(f.evidenceData || {}), [field.id]: e.target.value } } : f))} />
+                                                   <div className="flex items-center justify-between">
+                                                      <button 
+                                                        onClick={async () => {
+                                                          const drafted = await geminiService.draftAcademicEvidence(typeof currentValue === 'string' ? currentValue : '', fn.name);
+                                                          setAssignedFunctions(prev => prev.map(f => f.id === fn.id ? { ...f, evidenceData: { ...(f.evidenceData || {}), [field.id]: drafted } } : f));
+                                                        }}
+                                                        className="flex items-center gap-2 text-[9px] font-black uppercase text-indigo-500 hover:text-indigo-700 transition-all bg-indigo-50 px-4 py-2 rounded-full"
+                                                      >
+                                                         <Sparkles size={14} /> IA Unadista
+                                                      </button>
+                                                      {isLink && <span className="text-[8px] font-black uppercase text-emerald-500 flex items-center gap-1"><CheckCircle2 size={12}/> Enlace Detectado para PDF</span>}
                                                    </div>
                                                 </div>
                                               ) : (
-                                                <>
-                                                  <Upload size={72} className="text-slate-200 group-hover/drop:text-emerald-500 mb-6 transition-colors duration-500" />
-                                                  <span className="text-[12px] font-black uppercase text-slate-400 tracking-[0.4em] text-center max-w-xs">Arrastre el archivo de evidencia digital</span>
-                                                </>
+                                                <label className="flex flex-col items-center justify-center border-4 border-dashed border-slate-100 rounded-[35px] p-12 hover:bg-emerald-50/50 transition-all cursor-pointer bg-slate-50/50 relative overflow-hidden group/upload">
+                                                   <input type="file" className="hidden" accept="image/*" onChange={(e) => {
+                                                     const file = e.target.files?.[0];
+                                                     if (file) {
+                                                       const reader = new FileReader();
+                                                       reader.onloadend = () => {
+                                                         setAssignedFunctions(prev => prev.map(f => f.id === fn.id ? { 
+                                                           ...f, 
+                                                           evidenceData: { 
+                                                             ...(f.evidenceData || {}), 
+                                                             [field.id]: { 
+                                                               name: file.name, 
+                                                               size: (file.size / 1024).toFixed(1) + ' KB',
+                                                               type: file.type, 
+                                                               data: reader.result as string 
+                                                             } 
+                                                           } 
+                                                         } : f));
+                                                       };
+                                                       reader.readAsDataURL(file);
+                                                     }
+                                                   }} />
+                                                   {currentValue ? (
+                                                     <div className="flex flex-col items-center gap-6 animate-in zoom-in-95">
+                                                        {(currentValue as any).data && (
+                                                          <img src={(currentValue as any).data} className="w-48 h-32 object-cover rounded-2xl shadow-xl ring-4 ring-white" />
+                                                        )}
+                                                        <div className="text-center">
+                                                           <p className="text-sm font-black text-slate-800 uppercase">{(currentValue as any).name}</p>
+                                                           <p className="text-[9px] font-black uppercase text-emerald-600 mt-1">Fotografía Lista para Informe ✓</p>
+                                                        </div>
+                                                     </div>
+                                                   ) : (
+                                                     <div className="text-center space-y-3">
+                                                        <Upload size={32} className="text-slate-300 mx-auto group-hover/upload:text-indigo-400 group-hover/upload:scale-110 transition-all" />
+                                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cargar Fotografía de Evidencia</p>
+                                                     </div>
+                                                   )}
+                                                </label>
                                               )}
-                                           </label>
-                                        </div>
-                                      )}
-                                   </div>
-                                 );
-                               })}
-                            </div>
-                            
-                            {progress === 100 && fn.status !== 'Entregado' && (
-                              <div className="mt-16 bg-slate-900 p-12 rounded-[50px] text-white flex flex-col md:flex-row items-center justify-between shadow-4xl animate-in slide-in-from-bottom-6 relative overflow-hidden">
-                                 <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 blur-[80px] rounded-full pointer-events-none"></div>
-                                 <div className="flex items-center gap-8 relative z-10">
-                                    <div className="p-6 bg-emerald-500 text-white rounded-[32px] shadow-2xl animate-bounce">
-                                       <Fingerprint size={48} />
+                                           </div>
+                                         );
+                                       })}
                                     </div>
-                                    <div>
-                                       <h6 className="text-3xl font-brand font-black uppercase tracking-tighter">Informe Listo para Consignar</h6>
-                                       <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-300 opacity-80 mt-1">El documento será archivado oficialmente al reportar</p>
-                                    </div>
-                                 </div>
-                                 <div className="flex gap-4 relative z-10 mt-8 md:mt-0">
-                                    <button onClick={() => setShowEvidenceForm(null)} className="px-10 py-5 text-slate-400 font-black text-xs uppercase tracking-widest hover:text-white transition-all">Pausar Proceso</button>
-                                    <button 
-                                      onClick={() => setIsPreviewingPDF(fn.id)}
-                                      className="bg-emerald-500 text-white px-12 py-6 rounded-[35px] font-black text-xs uppercase tracking-[0.3em] shadow-3xl hover:bg-emerald-600 hover:scale-105 transition-all flex items-center gap-4 ring-8 ring-emerald-500/10"
-                                    >
-                                       <Printer size={22} /> Visualizar Informe Previo
-                                    </button>
+                                    {progress === 100 && (
+                                      <button onClick={() => finalizeReport(fn)} className="w-full bg-emerald-600 text-white py-8 rounded-[40px] font-black text-xs uppercase tracking-[0.4em] shadow-4xl hover:bg-slate-900 transition-all flex items-center justify-center gap-6 group">
+                                         <Fingerprint size={32} /> RADICAR INFORME FINAL (PDF)
+                                      </button>
+                                    )}
                                  </div>
                               </div>
                             )}
                          </div>
-                       )}
-                    </div>
-                  );
-                })}
-             </div>
-          </div>
-        ))}
-      </div>
+                       );
+                     })}
+                  </div>
+               </div>
+             ))
+           )}
+        </div>
+      )}
     </div>
   );
 };
+
+const Microscope = ({ size }: { size: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 18h8"/><path d="M3 22h18"/><path d="M14 22a7 7 0 1 0 0-14h-1"/><path d="M9 14h2"/><path d="M9 12a2 2 0 0 1-2-2V6h6v4a2 2 0 0 1-2 2Z"/><path d="M12 6V3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3"/>
+  </svg>
+);
 
 export default TeacherFunctions;
