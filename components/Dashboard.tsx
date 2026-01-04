@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Users, 
   GraduationCap, 
@@ -10,7 +10,11 @@ import {
   Star,
   Layers,
   Calendar,
-  ChevronRight
+  ChevronRight,
+  Activity,
+  CheckCircle2,
+  XCircle,
+  RefreshCw
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -31,6 +35,18 @@ const stats = [
 ];
 
 const Dashboard: React.FC = () => {
+  const [logs, setLogs] = useState<any[]>([]);
+
+  useEffect(() => {
+    const updateLogs = () => {
+      const savedLogs = JSON.parse(localStorage.getItem('edupro_sync_logs') || '[]');
+      setLogs(savedLogs);
+    };
+    updateLogs();
+    const interval = setInterval(updateLogs, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
@@ -60,24 +76,17 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
         {stats.map((stat, idx) => (
           <div key={stat.label} 
-            style={{ animationDelay: `${idx * 150}ms` }}
-            className="group relative bg-white p-8 rounded-[40px] shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 border border-slate-100 overflow-hidden animate-in zoom-in-95"
+            className="group relative bg-white p-8 rounded-[40px] shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 border border-slate-100 overflow-hidden"
           >
-            {/* Background Decoration */}
             <div className={`absolute -right-4 -bottom-4 w-24 h-24 bg-gradient-to-br ${stat.gradient} opacity-5 group-hover:opacity-10 rounded-full blur-2xl transition-all`}></div>
-            
             <div className="flex items-center justify-between mb-8">
-              <div className={`p-4 rounded-2xl bg-gradient-to-br ${stat.gradient} text-white shadow-lg shadow-indigo-500/10 group-hover:scale-110 transition-transform`}>
+              <div className={`p-4 rounded-2xl bg-gradient-to-br ${stat.gradient} text-white shadow-lg`}>
                 <stat.icon size={24} />
               </div>
-              <div className="flex flex-col items-end">
-                <span className={`text-[10px] font-black px-3 py-1 rounded-full ${stat.grow.includes('+') ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
-                  {stat.grow}
-                </span>
-                <span className="text-[10px] font-bold text-slate-400 mt-1">Vs mes anterior</span>
-              </div>
+              <span className={`text-[10px] font-black px-3 py-1 rounded-full ${stat.grow.includes('+') ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                {stat.grow}
+              </span>
             </div>
-            
             <p className="text-slate-400 text-xs font-black uppercase tracking-widest mb-1">{stat.label}</p>
             <div className="flex items-baseline gap-2">
               <h3 className="text-3xl font-brand font-black text-slate-900 tracking-tighter">{stat.value}</h3>
@@ -87,20 +96,14 @@ const Dashboard: React.FC = () => {
         ))}
       </div>
 
-      {/* Charts & Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        <div className="lg:col-span-2 bg-white/70 backdrop-blur-xl p-10 rounded-[50px] border border-white shadow-xl">
+        <div className="lg:col-span-2 bg-white p-10 rounded-[50px] border border-slate-100 shadow-xl">
           <div className="flex items-center justify-between mb-10">
             <div>
               <h3 className="font-brand font-black text-2xl text-slate-900 tracking-tighter">Matrícula Semestral</h3>
               <p className="text-sm text-slate-400 font-medium">Crecimiento orgánico institucional</p>
             </div>
-            <div className="flex bg-slate-100 p-1.5 rounded-2xl">
-               <button className="px-4 py-2 bg-white rounded-xl shadow-sm text-xs font-bold text-slate-800">Mensual</button>
-               <button className="px-4 py-2 text-xs font-bold text-slate-500">Anual</button>
-            </div>
           </div>
-          
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data}>
@@ -113,51 +116,49 @@ const Dashboard: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 700}} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 700}} />
-                <Tooltip 
-                  contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)', fontWeight: 'bold'}}
-                  cursor={{stroke: '#6366f1', strokeWidth: 2}}
-                />
+                <Tooltip contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)', fontWeight: 'bold'}} />
                 <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={4} fillOpacity={1} fill="url(#chartGradient)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
+        {/* CLOUD TRAFFIC MONITOR */}
         <div className="bg-slate-900 rounded-[50px] p-10 text-white relative overflow-hidden flex flex-col shadow-2xl">
-          {/* Accent decoration */}
           <div className="absolute -right-20 -top-20 w-64 h-64 bg-indigo-500/20 rounded-full blur-[80px]"></div>
-          
           <div className="relative z-10 flex flex-col h-full">
             <div className="flex items-center justify-between mb-10">
-              <h3 className="font-brand font-black text-xl tracking-tighter uppercase">Tareas de Hoy</h3>
-              <div className="bg-white/10 p-2 rounded-xl text-indigo-400">
-                <Zap size={20} />
+              <h3 className="font-brand font-black text-xl tracking-tighter uppercase">Monitor Cloud</h3>
+              <div className="bg-indigo-500/20 p-2 rounded-xl text-indigo-400">
+                <Activity size={20} className="animate-pulse" />
               </div>
             </div>
 
-            <div className="space-y-6 flex-1">
-              {[
-                { title: 'Reunión con Decanatura', time: '10:00 AM', status: 'Inicia en 15m' },
-                { title: 'Firma de Títulos', time: '02:30 PM', status: 'Pendiente' },
-                { title: 'Cierre de Admisiones', time: '05:00 PM', status: 'Crítico' },
-              ].map((task, i) => (
-                <div key={i} className="group cursor-pointer">
-                  <div className="flex justify-between items-start mb-2">
-                    <p className="font-bold text-slate-100 group-hover:text-indigo-400 transition-colors">{task.title}</p>
-                    <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">{task.status}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-400 text-xs">
-                    <Calendar size={12} /> {task.time}
-                  </div>
-                  <div className="h-1.5 w-full bg-white/5 rounded-full mt-3 overflow-hidden">
-                    <div className="h-full w-1/3 bg-indigo-500 rounded-full group-hover:w-full transition-all duration-1000"></div>
-                  </div>
+            <div className="space-y-4 flex-1">
+              {logs.map((log) => (
+                <div key={log.id} className="p-4 bg-white/5 border border-white/5 rounded-2xl flex items-center justify-between">
+                   <div className="flex items-center gap-4">
+                      <div className={`p-2 rounded-lg ${log.status === 'success' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                         {log.status === 'success' ? <CheckCircle2 size={16}/> : <XCircle size={16}/>}
+                      </div>
+                      <div>
+                         <p className="text-[10px] font-black uppercase tracking-widest leading-none mb-1">{log.action}</p>
+                         <p className="text-[9px] font-bold text-slate-500">{log.time} • {log.type}</p>
+                      </div>
+                   </div>
+                   <div className="w-1 h-8 bg-white/5 rounded-full"></div>
                 </div>
               ))}
+              {logs.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-600 opacity-50">
+                   <RefreshCw size={40} className="mb-4 animate-spin-slow" />
+                   <p className="text-[10px] font-black uppercase tracking-widest">Esperando Actividad...</p>
+                </div>
+              )}
             </div>
 
-            <button className="w-full mt-10 py-4 bg-white text-slate-900 rounded-3xl font-black text-sm hover:bg-indigo-400 hover:text-white transition-all shadow-xl flex items-center justify-center gap-2">
-              Ver Agenda Completa <ChevronRight size={18} />
+            <button className="w-full mt-10 py-4 bg-white/10 hover:bg-white text-white hover:text-slate-900 rounded-3xl font-black text-sm transition-all flex items-center justify-center gap-2">
+              Ver Logs Completos <ChevronRight size={18} />
             </button>
           </div>
         </div>
